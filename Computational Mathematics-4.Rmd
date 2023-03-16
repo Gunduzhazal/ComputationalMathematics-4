@@ -1,0 +1,163 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## Data 605-Assignment 4 ##
+
+**Hazal Gunduz**
+
+**With the attached data file, build and visualize  eigenimagery that accounts for 80% of the variability.  Provide full R code and discussion.**
+
+**Loading Libraries**
+
+```{r}
+library(foreach)
+library(jpeg)
+library(EBImage)
+library(OpenImageR)
+```
+
+*We have 17 shoes images in the .jpg folder.*
+
+```{r}
+files<-list.files("/Users/otheraccount/Downloads/jpg/", pattern="\\.jpg")[1:17] 
+```
+
+**Shoes images function**
+
+```{r}
+height = 1200; 
+width = 2500; 
+scale = 20
+plot_jpeg = function(path, add=FALSE) { 
+jpg = readJPEG(path, native=T) 
+res = dim(jpg)[2:1] 
+  if (!add) 
+  plot(1,1,xlim=c(1,res[1]), ylim=c(1, res[2]), asp=1, type='n', xaxs='i', yaxs='i', xaxt='n', yaxt='n', xlab='', ylab='', bty='n')
+  rasterImage(jpg, 1, 1, res[1], res[2])
+}
+```
+
+*Loading the data into an array and resizing function scales.*
+
+```{r}
+images<-array(rep(0, length(files)*height/scale*width/scale*3), dim=c(length(files), height/scale, width/scale, 3))
+
+for (i in 1:17) {
+temp<-resize(readJPEG(paste0("/Users/otheraccount/Downloads/jpg/", files[i])), height/scale, width/scale)
+images[i,,,]=array(temp, dim=c(1, height/scale, width/scale, 3))
+}
+dim(images)
+```
+
+**Vectorizing**
+
+```{r}
+flat<-matrix(0, 17, prod(dim(images))) 
+
+for (i in 1:17) {
+newimages<-readJPEG(paste0("/Users/otheraccount/Downloads/jpg/", files[i]))
+r=as.vector(images[i,,,1]); g=as.vector(images[i,,,2]); b=as.vector(images[i,,,3])
+flat[i,] <- t(c(r, g, b))
+}
+
+shoes<-as.data.frame(t(flat))
+```
+
+**Visualize the actual plots**
+
+*Let’s look at the shoes, using the 'plot_jpeg' function to see the images.*
+
+```{r}
+par(mfrow=c(6,3))
+par(mai=c(.03,.03,.03,.03))
+
+for (i in 1:17) { 
+plot_jpeg(writeJPEG(images[i,,,]))
+}
+```
+
+**Structure of Eigencomponents**
+
+*We need to scale and center data with using the scale function.*
+
+```{r}
+scaled<-scale(shoes, center=TRUE, scale=TRUE)
+mean.shoe<-attr(scaled, "scaled:center")
+std.shoe<-attr(scaled, "scaled:scale")
+dim(scaled)
+```
+
+**Calculate Covariance (Correlation)**
+
+*We are using the Correlation matrix. And correlation matrix will be used to determine the eigencomponents.*
+
+```{r}
+Sigma_<-cor(scaled)
+dim(Sigma_)
+```
+
+**Get the Eigencomponents**
+
+```{r}
+myeigen<-eigen(Sigma_)
+myeigen
+```
+
+```{r}
+myeigen<-eigen(Sigma_)
+cumsum(myeigen$values) / sum(myeigen$values)
+```
+
+*We see that 80% variability at the position of 2, so we find the eigenshoes at [, 2].*
+
+**Eigenshoes**
+
+```{r}
+scaling<-diag(myeigen$values[1:5]^(-1/2)) / (sqrt(nrow(scaled)-1))
+eigenshoes<-scaled%*%myeigen$vectors[,1:5]%*%scaling
+par(mfrow=c(2,3))
+imageShow(array(eigenshoes[,2], c(60, 125, 3)))
+```
+
+*Transform of the images.*
+
+```{r}
+height=1200
+width=2500
+scale=20
+newimages=images
+dim(newimages)=c(length(files), height*width*3/scale^2)
+pca<-princomp(t(as.matrix(newimages)), scores=TRUE, cor=TRUE)
+```
+
+**Eigenshoes**
+
+```{r}
+pca2<-t(pca$scores)
+dim(pca2)=c(length(files), height/scale, width/scale, 3)
+par(mfrow=c(5,5))
+par(mai=c(.01,.01,.01,.01))
+for (i in 1:17) {
+plot_jpeg(writeJPEG(pca2[i,,,]))
+}
+```
+
+```{r}
+a<-round(pca$sdev[1:17]^2 / sum(pca$sdev^2), 3)
+cumsum(a)
+```
+
+**New Data Set**
+
+We will write the new data set 80% of the variability for all images.
+
+```{r}
+x <- t(t(eigenshoes)%*%scaled)
+```
+
+
+Rpubs ->  https://rpubs.com/gunduzhazal/1005162
+
